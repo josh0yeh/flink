@@ -23,10 +23,13 @@ import org.apache.flink.client.deployment.ClusterRetrieveException;
 import org.apache.flink.client.deployment.ClusterSpecification;
 import org.apache.flink.client.program.ClusterClient;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.TestLogger;
+import org.apache.flink.yarn.cli.FlinkYarnSessionCli;
 
+import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
@@ -80,6 +83,67 @@ public class AbstractYarnClusterTest extends TestLogger {
 		} finally {
 			clusterDescriptor.close();
 		}
+	}
+
+	//@Test(expect = YarnDeploymentException.class)
+	@Test
+	public void testValidateClusterResources() throws Exception {
+		final ApplicationId applicationId = ApplicationId.newInstance(System.currentTimeMillis(), 42);
+		final ApplicationReport applicationReport = createApplicationReport(
+			applicationId,
+			YarnApplicationState.FINISHED,
+			FinalApplicationStatus.SUCCEEDED);
+		final YarnClient yarnClient = new TestingYarnClient(Collections.singletonMap(applicationId, applicationReport));
+		final YarnConfiguration yarnConfiguration = new YarnConfiguration();
+		yarnClient.init(yarnConfiguration);
+		yarnClient.start();
+		//final ClusterClient clusterClient = new ClusterClient(flinkConfiguration);
+		JobGraph jobGraph = new JobGraph();
+
+		YarnClusterDescriptor yarnClusterDescriptor = new YarnClusterDescriptor(
+			new Configuration(),
+			yarnConfiguration,
+			"./configurationDirectory",
+			yarnClient,
+			false
+		);
+
+		//ClusterSpecification clusterSpecification = new ClusterSpecification(1024, 1024, 8, 4).createClusterSpecification();
+		final Configuration configuration = new Configuration();
+		final int slotsPerTaskManager = 30;
+		configuration.setInteger(TaskManagerOptions.NUM_TASK_SLOTS, slotsPerTaskManager);
+
+		final String[] args = {"-ys", String.valueOf(slotsPerTaskManager)};
+		final FlinkYarnSessionCli flinkYarnSessionCli = new FlinkYarnSessionCli(
+			configuration,
+			temporaryFolder.newFolder().getAbsolutePath(),
+			"y",
+			"yarn");
+
+		CommandLine commandLine = flinkYarnSessionCli.parseCommandLineOptions(args, false);
+		final ClusterSpecification clusterSpecification = flinkYarnSessionCli.getClusterSpecification(commandLine);
+		yarnClusterDescriptor.deployInternal(
+			clusterSpecification,
+			"Flink applicationName",
+			"Flink yarnClusterEntrypoint",
+			jobGraph,
+			false
+		);
+
+//			ClusterSpecification spec = new ClusterSpecification(1024, 1024, 8, 8);
+//			int yarnMinAllocationMB = 1024;
+//			int yarnSchedulerMaxVcores = 8;
+//			ClusterResourceDescription res = new ClusterResourceDescription();
+//			final YarnClientApplication yarnApplication = yarnClient.createApplication();
+//			final GetNewApplicationResponse appResponse = yarnApplication.getNewApplicationResponse();
+//			Resource maxRes = appResponse.getMaximumResourceCapability();
+//
+//			validateClusterResources(
+//				spec,
+//				yarnMinAllocationMB,
+//				yarnSchedulerMaxVcores,
+//				maxRes,
+//				res);
 	}
 
 	private ApplicationReport createApplicationReport(
