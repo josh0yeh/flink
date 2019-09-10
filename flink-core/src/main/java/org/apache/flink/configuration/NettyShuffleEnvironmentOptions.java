@@ -105,7 +105,7 @@ public class NettyShuffleEnvironmentOptions {
 	 */
 	public static final ConfigOption<String> NETWORK_BUFFERS_MEMORY_MIN =
 		key("taskmanager.network.memory.min")
-			.defaultValue("64mb")
+			.defaultValue("64kb")
 			.withDescription("Minimum memory size for network buffers.");
 
 	/**

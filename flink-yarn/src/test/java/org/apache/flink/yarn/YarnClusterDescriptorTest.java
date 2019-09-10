@@ -139,6 +139,36 @@ public class YarnClusterDescriptorTest extends TestLogger {
 	}
 
 	@Test
+	public void testFailIfTaskSlotsHigherThanSchedulerMaxVcores() throws ClusterDeploymentException {
+		final Configuration flinkConfiguration = new Configuration();
+		flinkConfiguration.setInteger(ResourceManagerOptions.CONTAINERIZED_HEAP_CUTOFF_MIN, 0);
+
+		YarnClusterDescriptor clusterDescriptor = createYarnClusterDescriptor(flinkConfiguration);
+
+		clusterDescriptor.setLocalJarPath(new Path(flinkJar.getPath()));
+
+		ClusterSpecification clusterSpecification = new ClusterSpecification.ClusterSpecificationBuilder()
+			.setMasterMemoryMB(1)
+			.setTaskManagerMemoryMB(1)
+			.setNumberTaskManagers(1)
+			.setSlotsPerTaskManager(Integer.MAX_VALUE)
+			.createClusterSpecification();
+
+		try {
+			clusterDescriptor.deploySessionCluster(clusterSpecification);
+
+			fail("The deploy call should have failed.");
+		} catch (ClusterDeploymentException e) {
+			// we expect the cause to be an IllegalConfigurationException
+			if (!(e.getCause() instanceof IllegalConfigurationException)) {
+				throw e;
+			}
+		} finally {
+			clusterDescriptor.close();
+		}
+	}
+
+	@Test
 	public void testConfigOverwrite() throws ClusterDeploymentException {
 		Configuration configuration = new Configuration();
 		// overwrite vcores in config
